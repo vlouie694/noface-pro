@@ -14,20 +14,20 @@ def is_valid_number(number: Union[int, str], check_digit_func: Callable[[Union[i
     """
     return check_digit_func(number) == 0
 
-def validate_input_number(number: Union[int, str], min_cpn: int, max_cpn: int) -> bool:
+def validate_input_number(number: Union[int, str], min_num: int, max_num: int) -> bool:
     """
     Validates the input number to check if it's within the acceptable range.
     
     Args:
         number (Union[int, str]): The number to validate.
-        min_cpn (int): The minimum acceptable CPN number.
-        max_cpn (int): The maximum acceptable CPN number.
+        min_num (int): The minimum acceptable number.
+        max_num (int): The maximum acceptable number.
         
     Returns:
         bool: True if the number is valid, False otherwise.
     """
     try:
         num = int(number)
-        return min_cpn <= num <= max_cpn
+        return min_num <= num <= max_num
     except ValueError:
         return False
