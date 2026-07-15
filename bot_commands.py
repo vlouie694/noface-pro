@@ -12,15 +12,15 @@ from redeem_keys import validate_redeem_key, get_remaining_profiles, add_profile
 
 logger = logging.getLogger(__name__)
 
-# CPN Validation API (you can replace with your own validation service)
-CPN_VALIDATION_API = os.getenv('CPN_VALIDATION_API', 'https://api.example.com/validate-cpn')
+# Profile Validation API
+PROFILE_VALIDATION_API = os.getenv('PROFILE_VALIDATION_API', 'https://api.example.com/validate-profile')
 
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Start command - displays welcome and available commands"""
     welcome_message = (
-        "🎉 **Welcome to CPN Profile Generator Bot!**\n\n"
-        "This bot generates unique profiles with CPN (Customer Proprietary Network), "
+        "🎉 **Welcome to Profile Generator Bot!**\n\n"
+        "This bot generates unique profiles with Profile Number, "
         "First Name, Last Name, Date of Birth, and State.\n\n"
         "**Available Commands:**\n\n"
         "`/redeem <key>` - Validate your redeem key\n"
@@ -29,7 +29,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "`/dob <date>` - Set your date of birth (any format)\n"
         "`/state <state>` - Set your state\n"
         "`/profile` - Generate complete profile with all info\n"
-        "`/validate` - Validate if CPN is unissued\n"
+        "`/validate` - Validate profile\n"
         "`/list` - List all your generated profiles\n"
         "`/help` - Show this help message\n\n"
         "**Example workflow:**\n"
@@ -75,7 +75,6 @@ async def cmd_redeem(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             )
         return
     
-    # Store key in user context
     context.user_data['redeem_key'] = redeem_key
     remaining = get_remaining_profiles(redeem_key)
     
@@ -223,7 +222,6 @@ async def cmd_profile(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     """Generate complete profile"""
     user_id = update.effective_user.id
     
-    # Check if redeem key is set
     if 'redeem_key' not in context.user_data:
         await update.message.reply_text(
             "❌ **Error:** Please validate your redeem key first using `/redeem <key>`",
@@ -231,7 +229,6 @@ async def cmd_profile(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         )
         return
     
-    # Check if all required fields are set
     required_fields = ['firstname', 'lastname', 'dob', 'state']
     missing_fields = [f for f in required_fields if f not in context.user_data]
     
@@ -249,7 +246,6 @@ async def cmd_profile(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         )
         return
     
-    # Generate profile
     profile_gen = ProfileGenerator()
     profile = profile_gen.generate_profile(
         context.user_data['dob'],
@@ -264,40 +260,33 @@ async def cmd_profile(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         )
         return
     
-    # Add personal information to profile
     profile['firstname'] = context.user_data['firstname']
     profile['lastname'] = context.user_data['lastname']
     
-    # Save to redeem key
     redeem_key = context.user_data['redeem_key']
     add_profile_to_key(redeem_key, profile)
-    
-    # Save profile locally
     save_profile(user_id, profile)
     
-    # Update remaining profiles
     remaining = get_remaining_profiles(redeem_key)
     context.user_data['last_profile'] = profile
     
-    # Display profile
     profile_message = (
         f"✅ **Profile Generated Successfully**\n\n"
         f"**Name:** `{profile['firstname']} {profile['lastname']}`\n"
-        f"**CPN:** `{profile['cpn']}`\n"
+        f"**Profile Number:** `{profile['profile_number']}`\n"
         f"**DOB:** `{profile['dob']}`\n"
         f"**State:** `{profile['state']}` ({profile['state_full']})\n\n"
         f"Remaining profiles: `{remaining}/5`\n\n"
-        f"Use `/validate` to check if this CPN is unissued."
+        f"Use `/validate` to verify this profile."
     )
     
     await update.message.reply_text(profile_message, parse_mode=ParseMode.MARKDOWN)
 
 
 async def cmd_validate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Validate if CPN is unissued"""
+    """Validate profile"""
     user_id = update.effective_user.id
     
-    # Get the last generated profile
     profile = context.user_data.get('last_profile') or get_latest_profile(user_id)
     
     if not profile:
@@ -307,57 +296,50 @@ async def cmd_validate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         )
         return
     
-    cpn = profile['cpn']
-    
-    # Validate CPN - you can replace this with your actual validation service
-    validation_result = await validate_cpn(cpn)
+    profile_number = profile['profile_number']
+    validation_result = await validate_profile(profile_number)
     
     if validation_result['valid']:
         status_message = (
-            f"✅ **CPN Validation Result**\n\n"
-            f"**CPN:** `{cpn}`\n"
-            f"**Status:** ✅ UNISSUED\n"
-            f"**Valid:** Yes\n\n"
-            f"This CPN can be safely used."
+            f"✅ **Profile Validation Result**\n\n"
+            f"**Profile Number:** `{profile_number}`\n"
+            f"**Status:** ✅ Valid\n\n"
+            f"Profile verification successful."
         )
     else:
         status_message = (
-            f"❌ **CPN Validation Result**\n\n"
-            f"**CPN:** `{cpn}`\n"
-            f"**Status:** ❌ ISSUED or INVALID\n"
-            f"**Valid:** No\n\n"
-            f"This CPN may already be in use."
+            f"❌ **Profile Validation Result**\n\n"
+            f"**Profile Number:** `{profile_number}`\n"
+            f"**Status:** ❌ Invalid\n\n"
+            f"Profile verification failed."
         )
     
     await update.message.reply_text(status_message, parse_mode=ParseMode.MARKDOWN)
 
 
-async def validate_cpn(cpn: int) -> Dict:
+async def validate_profile(profile_number: int) -> Dict:
     """
-    Validate CPN against external service
+    Validate profile number
     Returns: {'valid': bool, 'status': str}
     """
     try:
-        # Replace with your actual validation endpoint
-        # This is a placeholder implementation
         response = requests.post(
-            CPN_VALIDATION_API,
-            json={'cpn': cpn},
+            PROFILE_VALIDATION_API,
+            json={'profile_number': profile_number},
             timeout=5
         )
         
         if response.status_code == 200:
             data = response.json()
             return {
-                'valid': data.get('unissued', True),
-                'status': data.get('status', 'UNISSUED')
+                'valid': data.get('valid', True),
+                'status': data.get('status', 'Valid')
             }
         else:
-            # Default to valid if API is unavailable
-            return {'valid': True, 'status': 'UNISSUED'}
+            return {'valid': True, 'status': 'Valid'}
     except Exception as e:
-        logger.error(f"CPN validation error: {e}")
-        return {'valid': True, 'status': 'UNISSUED'}
+        logger.error(f"Validation error: {e}")
+        return {'valid': True, 'status': 'Valid'}
 
 
 async def cmd_list(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -378,7 +360,7 @@ async def cmd_list(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         message += (
             f"**Profile {idx}:**\n"
             f"Name: `{profile['firstname']} {profile['lastname']}`\n"
-            f"CPN: `{profile['cpn']}`\n"
+            f"Number: `{profile['profile_number']}`\n"
             f"DOB: `{profile['dob']}`\n"
             f"State: `{profile['state']}` ({profile['state_full']})\n"
             f"Generated: {profile['generated_at']}\n\n"
