@@ -1,2 +1,1 @@
-# cpngenerator
- 
+Profile Generator Bot
