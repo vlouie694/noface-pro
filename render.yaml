@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: noface-pro-bot
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python bot_main.py
+    envVars:
+      - key: TELEGRAM_BOT_TOKEN
+        scope: run
+        sync: false
